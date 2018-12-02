@@ -49,16 +49,13 @@ void txLightsFrame(master_light_pattern new_pattern) {
 	Serial.println("transmitting light frame...");
 	
 	for (int i = 0; i < 4; i++) {
-		light_controllers
+		light_controllers[i].bulb_pattern = testing_pattern.bulbs[i];
+		light_controllers[i].status_reg = testing_pattern.status_reg;
 
 
 	}
 
-
-
-
-
-
+	// TODO remove comments once all 4 boards enabled
 	//for (unsigned char i = 0; i < 4; i++) {
 		Wire.beginTransmission(slave_id[0]);
 		Wire.write(slave_id[0]);
