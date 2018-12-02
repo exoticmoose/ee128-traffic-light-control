@@ -89,5 +89,6 @@
             "cppStandard": "c++11",
             "compilerPath": "C:/Users/SAE Paul/.platformio/packages/toolchain-atmelavr/bin/avr-gcc.exe  -fno-fat-lto-objects -Os -Wall -ffunction-sections -fdata-sections -flto -mmcu=atmega328p"
         }
-    ]
+    ],
+    "version": 4
 }
