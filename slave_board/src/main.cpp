@@ -1,9 +1,9 @@
 #include <Arduino.h>
 #include <Wire.h>
 
-#define URGENT_UPDATE 0x01
+#define WAITING 0x01
 #define CASUAL_UPDATE 0x02
-#define WAITING 0x04
+#define URGENT_UPDATE 0x04
 #define FAULT 0x08
 
 #define MY_ADDRESS 8
@@ -28,7 +28,6 @@ void receiveEvent(int var) {
 		tmp_time_in_pattern |= (c << (8 * i));
 	}
 	
-
 	Serial.print("wire available: ");
 	Serial.println(Wire.available());
 	Serial.println(rx_slave_id);
@@ -37,7 +36,6 @@ void receiveEvent(int var) {
 
 	Serial.println(tmp_time_in_pattern);
 	Serial.println("- - - - - - - - - -");
-
 }
 
 void emergencyMode() {
