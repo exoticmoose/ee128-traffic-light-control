@@ -79,10 +79,10 @@ void txLightsFrame(master_light_pattern new_pattern) {
 
 	// TODO remove comments once all 4 boards enable
 	for (unsigned char i = 0; i < 4; i++) {
-		Wire.beginTransmission(slave_id[0]);
-		Wire.write(light_controllers[0].slave_id);
-		Wire.write(light_controllers[0].bulb_pattern);
-		Wire.write(light_controllers[0].status_reg);
+		Wire.beginTransmission(slave_id[i]);
+		Wire.write(light_controllers[i].slave_id);
+		Wire.write(light_controllers[i].bulb_pattern);
+		Wire.write(light_controllers[i].status_reg);
 		Wire.write(testing_pattern.time_in_pattern);
 		Wire.write(testing_pattern.time_in_pattern >> 8);
 		Wire.write(testing_pattern.time_in_pattern >> 16);

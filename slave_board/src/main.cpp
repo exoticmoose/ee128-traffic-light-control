@@ -27,9 +27,9 @@ void receiveEvent(int var) {
 		unsigned char c = Wire.read();
 		tmp_time_in_pattern |= (c << (8 * i));
 	}
-	
-	Serial.print("wire available: ");
-	Serial.println(Wire.available());
+	Serial.println(millis());
+	Serial.print(" - - - - - - -");
+	//Serial.println(Wire.available());
 	Serial.println(rx_slave_id);
 	Serial.println(bulbs);
 	Serial.println(tmp_status_reg);
@@ -56,8 +56,8 @@ void loop() {
 
 	 // TODO
  	 // if more than 500ms since last instruction, enter blinking red light loop
-	if (last_instruction_delay > 15) {
-		emergencyMode();
-	}
+	// if (last_instruction_delay > 15) {
+	// 	emergencyMode();
+	// }
 
 }
