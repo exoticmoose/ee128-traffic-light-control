@@ -22,7 +22,7 @@ unsigned int displayed_time_in_pattern = 0;
 const byte ButtonPin = 2;
 const byte ButtonPin2 = 3;
 int val = 0;
-char EmergencyFlag = 0;
+char tmp_flag_emergency = 0;
 char Last_Sent = 0;
 char* Message = 0;
 
@@ -82,15 +82,15 @@ void IR_Sensor()
 {
   val = analogRead(0);
 
-  if(val < 970 && EmergencyFlag == 0)
+  if(val < 970 && tmp_flag_emergency == 0)
   {
      status_reg = status_reg | EMERGENCY;
      Serial.println("0x01");
-     EmergencyFlag = 1;
+     tmp_flag_emergency = 1;
   }
-  else if(EmergencyFlag == 1 and val > 970)
+  else if(tmp_flag_emergency == 1 and val > 970)
   {
-    EmergencyFlag = 0;
+    tmp_flag_emergency = 0;
   }
   
 }

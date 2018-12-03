@@ -10,7 +10,7 @@
 #define NORTH_SOUTH 0x02
 #define EAST_WEST 0x04
 
-#define TICK_PERIOD 100
+#define TICK_PERIOD 500
 
 
 
@@ -29,6 +29,7 @@ unsigned char pattern_cycle_index = 0;
 
 unsigned char requests_crosswalk = 0x00;
 unsigned char requests_emergency = 0x00;
+unsigned char pending_movements = 0x00;
 
 struct light_interface {
 	unsigned char slave_id = 0x00;
@@ -54,7 +55,7 @@ unsigned short default_pattern_cycle[6] = { 0b0000001100001100,		// Green E/W, R
 											0b0000100001100001,		// Red E/W, Green N/S
 											0b0000100010100010,		// Red E/W, Yellow N/S
 											0b0000100100100100 };	// Red E/W, Red N/S
-unsigned short default_pattern_delays[6] = {10000, 2000, 1000, 10000, 2000, 1000}; // how long to wait between transitions (ms)
+unsigned short default_pattern_delays[6] = {4000, 1000, 500, 4000, 1000, 500}; // how long to wait between transitions (ms)
 
 //
 void txLightsFrame(master_light_pattern new_pattern) {
@@ -84,6 +85,20 @@ void txLightsFrame(master_light_pattern new_pattern) {
 
 	// TODO remove comments once all 4 boards enable
 	for (unsigned char i = 0; i < 4; i++) {
+
+		/*
+		Serial.println(" - - - - - - - Wire dump: ");
+		Serial.println(light_controllers[i].slave_id);
+		Serial.println(light_controllers[i].bulb_pattern);
+		Serial.println(testing_pattern.time_in_pattern, HEX);
+		Serial.println(testing_pattern.time_in_pattern >> 8, HEX);
+		Serial.println(testing_pattern.time_in_pattern >> 16, HEX);
+		Serial.println(testing_pattern.time_in_pattern >> 24, HEX);
+		Serial.println("End Wire dump - - - - - - - -");
+		*/
+
+
+
 		Wire.beginTransmission(slave_id[i]);
 		Wire.write(light_controllers[i].slave_id);
 		Wire.write(light_controllers[i].bulb_pattern);
@@ -310,7 +325,7 @@ void setup() {
 void loop() {
 	// put your main code here, to run repeatedly:
 	Serial.println("- LOOP - ");
-	delay(TICK_PERIOD * 3);
+	delay(TICK_PERIOD);
 
 	sys_time = millis();
 	state_time = sys_time - sys_state_time;	
