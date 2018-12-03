@@ -18,7 +18,7 @@ uint8_t slave_id[4] = {8, 16, 32, 64};
 
 enum States {BEGIN, INIT, START, TRANSMIT, ERROR_CHECK, PROCESS_OUTPUTS, WAIT, FAULT_RECOVER};
 enum TrafficPatterns {NS_RED, NS_GREEN, NS_YELLOW, EW_RED, EW_GREEN, EW_YELLOW};
-unsigned int traffic_pattern_times[6] = {1000, 15000, 2000, 1000, 25000, 2000};
+unsigned int traffic_pattern_times[6] = {500, 15000, 2000, 500, 25000, 2000};
 unsigned short traffic_pattern_lights[6] = {0b0000100100100100,		// red ns
 											0b0000100001100001,		// green ns
 											0b0000100010100010, 	// yellow ns
@@ -343,8 +343,8 @@ void pollSlaves() {
 					}
 					if (c & 0x80) {
 						// fault flag from slave
-						testing_pattern.status_reg |= FAULT;
-						fault = 1;
+						//testing_pattern.status_reg |= FAULT;
+						//fault = 1;
 					}
 				}// else Serial.println("Zero response from slave");
 			}

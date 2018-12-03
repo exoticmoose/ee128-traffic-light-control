@@ -68,7 +68,6 @@ void requestEvent() {
 void emergencyMode() {
 
 	Serial.println("entering emergency mode");
-	status_reg = status_reg | ERROR_MODE;
 	pattern_count++;
 	if (pattern_count < 5) {
 		digitalWrite(9, HIGH);
