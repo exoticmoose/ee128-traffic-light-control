@@ -17,6 +17,13 @@
 uint8_t slave_id[4] = {8, 16, 32, 64};
 
 enum States {BEGIN, INIT, START, TRANSMIT, ERROR_CHECK, PROCESS_OUTPUTS, WAIT, FAULT_RECOVER};
+enum TrafficPatterns {ALL_RED, NS_GREEN, NS_YELLOW, EW_GREEN, EW_YELLOW};
+unsigned char traffic_pattern_lights[5] = { 0b0000100100100100,		// red
+											0b0000100001100001,		// green ns
+											0b0000100010100010, 	// yellow ns
+											0b0000001100001100,		// green ew
+											0b0000010100010100 };	// yellow ew
+
 
 unsigned long sys_time = 0; 		// absolute system time updated in loop()
 unsigned long sys_tick = 0; 		// number of ticks of SM total 
