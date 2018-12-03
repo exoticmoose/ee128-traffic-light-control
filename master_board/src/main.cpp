@@ -310,7 +310,7 @@ void setup() {
 void loop() {
 	// put your main code here, to run repeatedly:
 	Serial.println("- LOOP - ");
-	delay(TICK_PERIOD);
+	delay(TICK_PERIOD * 3);
 
 	sys_time = millis();
 	state_time = sys_time - sys_state_time;	

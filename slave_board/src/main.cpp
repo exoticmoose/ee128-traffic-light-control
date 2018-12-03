@@ -71,15 +71,12 @@ void Button_Push()
 {
 	status_reg = status_reg | NORTH_SOUTH;
     Serial.println("0x03");  
-   
 }
 
 void Button_Push2()
 {
-    
 	status_reg = status_reg | EAST_WEST;
     Serial.println("0x02");  
-    
 }
 
 void IR_Sensor()
@@ -110,7 +107,7 @@ void setup() {
 	pinMode(ButtonPin2, INPUT_PULLUP);
 	attachInterrupt(digitalPinToInterrupt(ButtonPin2), Button_Push2, RISING);
 	Serial.println("startup");
-
+	
 	DDRB = 0xFF;
   	PORTB = 0;
 
