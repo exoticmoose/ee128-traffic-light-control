@@ -6,14 +6,25 @@
 #define URGENT_UPDATE 0x04
 #define FAULT 0x08
 
+#define EMERGENCY 0x01
+#define NORTH_SOUTH 0x02
+#define EAST_WEST 0x04
+
 #define MY_ADDRESS 8
 
 int last_instruction_delay = 0;
-
-
 unsigned char displayed_bulbs = 0x00;
 unsigned char status_reg = 0x00;
 unsigned int displayed_time_in_pattern = 0;
+
+const byte ButtonPin = 2;
+const byte ButtonPin2 = 3;
+int val = 0;
+char EmergencyFlag = 0;
+char Last_Sent = 0;
+char* Message = 0;
+
+
 
 
 void receiveEvent(int var) {

@@ -164,10 +164,6 @@ void pollSlaves() {
 					if (c & EAST_WEST) {
 						requests_crosswalk |= 1 << (2*i + 1);
 					}
-					
-
-
-
 				} else Serial.println("Zero response from slave");
 			}
 
