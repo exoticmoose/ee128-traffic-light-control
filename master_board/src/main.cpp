@@ -6,6 +6,10 @@
 #define URGENT_UPDATE 0x04
 #define FAULT 0x08
 
+#define EMERGENCY 0x01
+#define NORTH_SOUTH 0x02
+#define EAST_WEST 0x04
+
 #define TICK_PERIOD 100
 
 
@@ -20,34 +24,36 @@ unsigned long sys_state_time = 0; 	// system time at start of current state, upd
 unsigned long state_time = 0; 		// time elapsed in current state
 States sys_state = BEGIN;
 
-unsigned char fault = 0x00;			// global fault flag
+unsigned char fault = 0x00;							// global fault flag
+unsigned char pattern_cycle_index = 0;	
 
-unsigned char pattern_cycle_index = 0;
-
+unsigned char requests_crosswalk = 0x00;
+unsigned char requests_emergency = 0x00;
 
 struct light_interface {
 	unsigned char slave_id = 0x00;
 	unsigned char bulb_pattern = 0x00;
-	unsigned char status_reg = 0x00 | WAITING;
+	unsigned char status_reg = 0x00; // status register received FROM SLAVES
 };
 
 struct light_interface light_controllers[4];
 
 struct master_light_pattern {
 	unsigned char bulbs[4] = {0};
-	unsigned char status_reg = 0x00 | WAITING;
 	unsigned long time_in_pattern = 10000; // could be 0 default
+
+	unsigned char status_reg = 0x00 | WAITING; // status register for MASTER INTERNAL USE
   
 } default_master_light_pattern;
 
 struct master_light_pattern testing_pattern;
 
-unsigned short default_pattern_cycle[6] = {0b0000001100001100,		// Green E/W, Red S/N
-									0b0000010100010100,		// Yellow E/w, Red S/N
-									0b0000100100100100,		// Red E/W, Red N/S
-									0b0000100001100001,		// Red E/W, Green N/S
-									0b0000100010100010,		// Red E/W, Yellow N/S
-									0b0000100100100100};	// Red E/W, Red N/S
+unsigned short default_pattern_cycle[6] = { 0b0000001100001100,		// Green E/W, Red S/N
+											0b0000010100010100,		// Yellow E/w, Red S/N
+											0b0000100100100100,		// Red E/W, Red N/S
+											0b0000100001100001,		// Red E/W, Green N/S
+											0b0000100010100010,		// Red E/W, Yellow N/S
+											0b0000100100100100 };	// Red E/W, Red N/S
 unsigned short default_pattern_delays[6] = {10000, 2000, 1000, 10000, 2000, 1000}; // how long to wait between transitions (ms)
 
 //
@@ -57,7 +63,6 @@ void txLightsFrame(master_light_pattern new_pattern) {
 	// TODO remove comments once all 4 boards enable
 	for (int i = 0; i < 4; i++) {
 		light_controllers[i].bulb_pattern = testing_pattern.bulbs[i];
-		light_controllers[i].status_reg = testing_pattern.status_reg;
 	}
 		
 		
@@ -82,7 +87,6 @@ void txLightsFrame(master_light_pattern new_pattern) {
 		Wire.beginTransmission(slave_id[i]);
 		Wire.write(light_controllers[i].slave_id);
 		Wire.write(light_controllers[i].bulb_pattern);
-		Wire.write(light_controllers[i].status_reg);
 		Wire.write(testing_pattern.time_in_pattern);
 		Wire.write(testing_pattern.time_in_pattern >> 8);
 		Wire.write(testing_pattern.time_in_pattern >> 16);
@@ -123,6 +127,10 @@ unsigned char pollPatternUpdate() {
 
 
 void processOutputState() {
+
+	//unsigned char popped = pattern_change_requests.pop
+
+
 	pattern_cycle_index++;
 	if (pattern_cycle_index > 5) pattern_cycle_index = 0;
 	Serial.print("- - - - - - - - - pci: ");
@@ -134,9 +142,36 @@ void processOutputState() {
 		//Serial.println((default_pattern_cycle[pattern_cycle_index] >> (3 * i)) & 0x07);
 	}
 	testing_pattern.time_in_pattern = default_pattern_delays[pattern_cycle_index];
+}
+
+void pollSlaves() {
+	// send requests to each slave to obtain new traffic pattern update requests
+	for (int i = 0; i < 4; i++) {
+
+		Wire.requestFrom((int)slave_id[i], 1); // get status register of slave
+		while (Wire.available()) {
+				char c = Wire.read();
+				if (c) {
+					Serial.print("Got response: ");
+					Serial.println(c, HEX);
+					
+					if (c & EMERGENCY) {
+						requests_emergency |= 1 << i;
+					}
+					if (c & NORTH_SOUTH) {
+						requests_crosswalk |= 1 << (2*i + 0);
+					}
+					if (c & EAST_WEST) {
+						requests_crosswalk |= 1 << (2*i + 1);
+					}
+					
 
 
 
+				} else Serial.println("Zero response from slave");
+			}
+
+	}
 }
 
 
@@ -183,6 +218,7 @@ void sm_tick(States state) {
 			break;
 
 		case ERROR_CHECK:
+
 			if (fault) state = FAULT_RECOVER;
 			
 			// TODO psuedo
@@ -233,7 +269,7 @@ void sm_tick(States state) {
 		case WAIT:
 			// check if there's any updating to do
 			testing_pattern.status_reg =  pollPatternUpdate();
-
+			pollSlaves();
 			break;
 		case PROCESS_OUTPUTS:
 			// calculate next state outputs
