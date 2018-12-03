@@ -14,10 +14,12 @@
 #define MY_ADDRESS 16
 
 
-int last_instruction_delay = 0;
+int last_comms_delay = 0;
 unsigned char displayed_bulbs = 0x00;
 unsigned char status_reg = 0x00;
 unsigned int displayed_time_in_pattern = 0;
+unsigned int time_in_pattern = 0;
+unsigned char pattern_count = 0;
 
 const byte ButtonPin = 2;
 const byte ButtonPin2 = 3;
@@ -28,7 +30,7 @@ char* Message = 0;
 
 
 void receiveEvent(int var) {
-	last_instruction_delay = 0;
+	last_comms_delay = 0;
 
 	unsigned char rx_slave_id = Wire.read();
 	unsigned char bulbs = Wire.read();
@@ -51,12 +53,15 @@ void receiveEvent(int var) {
 	Serial.print("\tTIP: ");
 	Serial.println(tmp_time_in_pattern);
 	Serial.println("- - - - - - - - - -");
+
+	time_in_pattern = tmp_time_in_pattern;
 }
 
 void requestEvent() {
  
     Wire.write(status_reg);
     status_reg = status_reg & 0x00;
+	last_comms_delay = 0;
 }
 
 
@@ -64,6 +69,17 @@ void emergencyMode() {
 
 	Serial.println("entering emergency mode");
 	status_reg = status_reg | ERROR_MODE;
+	pattern_count++;
+	if (pattern_count < 5) {
+		digitalWrite(9, HIGH);
+		digitalWrite(8, LOW);
+		digitalWrite(7, LOW);
+	} else if (pattern_count > 5) {
+		digitalWrite(9, LOW);
+		digitalWrite(8, LOW);
+		digitalWrite(7, LOW);
+		if (pattern_count > 10) pattern_count = 0;
+	}
 }
 
 void Button_Push()
@@ -117,12 +133,9 @@ void loop() {
 	// put your main code here, to run repeatedly:
 	delay(100);
 	IR_Sensor();
-	last_instruction_delay++;
+	last_comms_delay++;
 
-	 // TODO
- 	 // if more than 500ms since last instruction, enter blinking red light loop
-	// if (last_instruction_delay > 15) {
-	// 	emergencyMode();
-	// }
-
+	if (last_comms_delay > 20) {
+		emergencyMode();
+	}
 }

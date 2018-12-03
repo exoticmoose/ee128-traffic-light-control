@@ -10,17 +10,19 @@
 #define NORTH_SOUTH 0x02
 #define EAST_WEST 0x04
 
-#define TICK_PERIOD 500
+#define TICK_PERIOD 50
 
 
 
 uint8_t slave_id[4] = {8, 16, 32, 64};
 
 enum States {BEGIN, INIT, START, TRANSMIT, ERROR_CHECK, PROCESS_OUTPUTS, WAIT, FAULT_RECOVER};
-enum TrafficPatterns {ALL_RED, NS_GREEN, NS_YELLOW, EW_GREEN, EW_YELLOW};
-unsigned char traffic_pattern_lights[5] = { 0b0000100100100100,		// red
+enum TrafficPatterns {NS_RED, NS_GREEN, NS_YELLOW, EW_RED, EW_GREEN, EW_YELLOW};
+unsigned int traffic_pattern_times[6] = {1000, 15000, 2000, 1000, 25000, 2000};
+unsigned short traffic_pattern_lights[6] = {0b0000100100100100,		// red ns
 											0b0000100001100001,		// green ns
 											0b0000100010100010, 	// yellow ns
+											0b0000100100100100,		// red ew
 											0b0000001100001100,		// green ew
 											0b0000010100010100 };	// yellow ew
 
@@ -28,9 +30,10 @@ unsigned long sys_time = 0; 		// absolute system time updated in loop()
 unsigned long sys_tick = 0; 		// number of ticks of SM total 
 unsigned long sys_state_time = 0; 	// system time at start of current state, updated at the end of sm_tick()
 unsigned long state_time = 0; 		// time elapsed in current state
+unsigned long light_time = 0;
 
 States sys_state = BEGIN;
-TrafficPatterns current_traffic_pattern = ALL_RED;
+TrafficPatterns current_traffic_pattern = NS_RED;
 
 unsigned char fault = 0x00;							// global fault flag
 unsigned char pattern_cycle_index = 0;	
@@ -56,41 +59,36 @@ struct master_light_pattern {
 
 struct master_light_pattern testing_pattern;
 
-unsigned short default_pattern_cycle[6] = { 0b0000001100001100,		// Green E/W, Red S/N
-											0b0000010100010100,		// Yellow E/w, Red S/N
-											0b0000100100100100,		// Red E/W, Red N/S
-											0b0000100001100001,		// Red E/W, Green N/S
-											0b0000100010100010,		// Red E/W, Yellow N/S
-											0b0000100100100100 };	// Red E/W, Red N/S
-unsigned short default_pattern_delays[6] = {4000, 1000, 500, 4000, 1000, 500}; // how long to wait between transitions (ms)
+//unsigned short default_pattern_cycle[6] = { 0b0000001100001100,		// Green E/W, Red S/N
+											// 0b0000010100010100,		// Yellow E/w, Red S/N
+											// 0b0000100100100100,		// Red E/W, Red N/S
+											// 0b0000100001100001,		// Red E/W, Green N/S
+											// 0b0000100010100010,		// Red E/W, Yellow N/S
+											// 0b0000100100100100 };	// Red E/W, Red N/S
+//unsigned short default_pattern_delays[6] = {4000, 1000, 500, 4000, 1000, 500}; // how long to wait between transitions (ms)
 
 //
 void txLightsFrame(master_light_pattern new_pattern) {
-	Serial.println("transmitting light frame...");
-	
-	// TODO remove comments once all 4 boards enable
+	//Serial.println("transmitting light frame...");
+	light_time = sys_time;
+
 	for (int i = 0; i < 4; i++) {
 		light_controllers[i].bulb_pattern = testing_pattern.bulbs[i];
 	}
 		
-		
-		
-		//debug
+	//debug
 
-		Serial.print("Controller bulb patterns: ");
-		Serial.print(light_controllers[0].bulb_pattern);
-		Serial.print(" ");
-		Serial.print(light_controllers[1].bulb_pattern);
-		Serial.print(" ");
-		Serial.print(light_controllers[2].bulb_pattern);
-		Serial.print(" ");
-		Serial.println(light_controllers[3].bulb_pattern);
+	Serial.print(" TX Controller bulb patterns: ");
+	Serial.print(light_controllers[0].bulb_pattern);
+	Serial.print(" ");
+	Serial.print(light_controllers[1].bulb_pattern);
+	Serial.print(" ");
+	Serial.print(light_controllers[2].bulb_pattern);
+	Serial.print(" ");
+	Serial.println(light_controllers[3].bulb_pattern);
 
-		// \debug
+	// \debug
 
-	//}
-
-	// TODO remove comments once all 4 boards enable
 	for (unsigned char i = 0; i < 4; i++) {
 
 		/*
@@ -118,7 +116,7 @@ void txLightsFrame(master_light_pattern new_pattern) {
 
 
 	
-	Serial.println("TX complete.");
+	//Serial.println("TX complete.");
 	
 }
 
@@ -127,26 +125,27 @@ unsigned char pollPatternUpdate() {
 	// should be called during WAIT state
 	// Check for urgent or casual state change calls
 	// update master pattern's status register
-	unsigned char tmp_status_reg;
+
 	//debug
 	//Serial.println(" - - - - - - - -  - POLL");
 	//Serial.print(" - - - - - - - - - state_time: ");
 	//Serial.println(state_time);
 	//Serial.print(" - - -- - - - -  -time in pattern: ");
 	//Serial.println(testing_pattern.time_in_pattern);
-	// \debug
-	if (state_time >= testing_pattern.time_in_pattern - TICK_PERIOD) {
+	if (fault) {
+		testing_pattern.status_reg = FAULT;
+	}
+	else if (state_time >= testing_pattern.time_in_pattern - TICK_PERIOD) {
 
-		tmp_status_reg = 0x00 | STANDARD_UPDATE;
+		testing_pattern.status_reg = 0x00 | STANDARD_UPDATE;
 
-	} else tmp_status_reg = 0x00 | WAITING;
-	// \debug
+	} else testing_pattern.status_reg = 0x00 | WAITING;
 
-	return tmp_status_reg;
+
+	return testing_pattern.status_reg;
 
 
 }
-
 
 void processOutputState() {
 
@@ -154,80 +153,169 @@ void processOutputState() {
 	// if (fault)
 	// else if (emergency)
 	// else if
-	TrafficPatterns next_traffic_pattern = ALL_RED;
+
+	unsigned long light_on_time = millis() - light_time;
+
+	Serial.println(" - - - - - - - - - - - - Processing Outputs");
+	Serial.print(" - - - - - - - - - - - - current_traffic_pattern: ");
+	Serial.println(current_traffic_pattern);
+	Serial.print(" - - - - - - - - - - - - requests_crosswalk: ");
+	Serial.println(requests_crosswalk, BIN);
+	Serial.print(" - - - - - - - - - - - - light_on_time: ");
+	Serial.println(light_on_time);
+
+
+
+	TrafficPatterns next_traffic_pattern = NS_RED;
 	int next_light_time = 0;
-	if (0) {}
-	else if (1) {
-		// Crosswalk decision tree
-		// requests_crosswalk b[7-4] = EW, b[3-0] NS
-		// if NS
-		if (requests_crosswalk & 0x0F) {
-			// NS Crosswalk priority over E/W
+	
+	unsigned short new_pattern = 0x00;
+	bool continue_cycle = true;
+	//bool no_change = false;
 
-			if (current_traffic_pattern == ALL_RED) {
-				next_traffic_pattern = 		NS_GREEN;
-				next_light_time = 			20 * 1000;
-				requests_crosswalk &= 0xF0;
-			} 
-			else if (current_traffic_pattern == EW_GREEN) {
-				next_traffic_pattern = 		EW_YELLOW;
-				next_light_time = 			2 * 1000;
-			} 
-			else if (current_traffic_pattern == EW_YELLOW) {
-				next_traffic_pattern = 		ALL_RED;
-				next_light_time = 			1 * 1000;
-			} 
+	/*
+	if more than 1:
+		everything go to yellow NOW
+		(next time around, everything go to RED)
+
+	if NOT more than 1:
+
+		if (currently: any yellow, or any red):
+			next state = red for 15 seconds
+			done!
+
+
+		
+		else find which slave via bitshift
+			if (slave ODD) { //
+				// going against it, turn it yellow
+				// going with current green light, do nothing
+			}
+			else if (slave EVEN) {
+				// going against it, turn it yellow
+				// going with current green light, do nothing
+			}
+
+
+
+	*/
+	if (requests_emergency) {
+		Serial.println("Found emergency requests");
+		Serial.println(requests_emergency,BIN);
+		Serial.println(current_traffic_pattern, BIN);
+		unsigned char re = requests_emergency;
+
+		if (!((re & (re - 1)) == 0)) { // if not a power of 2 / more than 1 bit set
+			Serial.println("Multiple emergency requests");
+			if (current_traffic_pattern == NS_RED) {
+				next_traffic_pattern = NS_RED;
+				next_light_time = 15 * 1000;
+				continue_cycle = false;
+			}
+			else if (current_traffic_pattern == EW_RED) {
+				next_traffic_pattern = EW_RED;
+				next_light_time = 15 * 1000;
+				continue_cycle = false;
+			}
 			else if (current_traffic_pattern == NS_GREEN) {
-				next_traffic_pattern = 		NS_GREEN;
-				next_light_time = 			20 * 1000;
-			} 
-			else if (current_traffic_pattern == NS_YELLOW) {
-				next_traffic_pattern = 		ALL_RED;
-				next_light_time = 			1 * 1000;
+				next_traffic_pattern = NS_YELLOW;
+				next_light_time = 1 * 1000;
+				continue_cycle = false;
+			}
+			else if (current_traffic_pattern == EW_GREEN) {
+				next_traffic_pattern = EW_YELLOW;
+				next_light_time = 1 * 1000;
+				continue_cycle = false;
 			}
 		}
-		else if (requests_crosswalk & 0xF0) {
-			// EW crosswalks 
-			if (requests_crosswalk & 0x0F) {
-			// NS Crosswalk priority over E/W
+		else { // only 1 light
+			Serial.println("Single emergency requests");
+			unsigned char idx = 0;
+			for (int i = 0; i < 4; i++) {
+				if ((re >> i) & 0x01) idx = i; // bit shift to find which slave index
+			}
+			Serial.println(idx);
 
-				if (current_traffic_pattern == ALL_RED) {
-					next_traffic_pattern = 		EW_GREEN;
-					next_light_time = 			20 * 1000;
-					requests_crosswalk &= 0xF0;
-				} 
-				else if (current_traffic_pattern == NS_GREEN) {
-					next_traffic_pattern = 		NS_YELLOW;
-					next_light_time = 			2 * 1000;
-				} 
-				else if (current_traffic_pattern == NS_YELLOW) {
-					next_traffic_pattern = 		ALL_RED;
-					next_light_time = 			1 * 1000;
-				} 
-				else if (current_traffic_pattern == NS_GREEN) {
-					next_traffic_pattern = 		NS_GREEN;
-					next_light_time = 			20 * 1000;
-				} 
-				else if (current_traffic_pattern == NS_YELLOW) {
-					next_traffic_pattern = 		ALL_RED;
-					next_light_time = 			1 * 1000;
+			if (idx == 1 || idx == 3) {
+				// If slave is NS
+				if (current_traffic_pattern == EW_GREEN) {
+					next_traffic_pattern = EW_YELLOW;
+					next_light_time = 2 * 1000;
+					continue_cycle = false;
 				}
+				else if (current_traffic_pattern == NS_RED) {
+					next_traffic_pattern = NS_RED;
+					next_light_time = 15 * 1000;
+					continue_cycle = false;
+				}
+
+
+			} 
+			else if (idx == 0 || idx == 2) {
+				// If slave is EW
+				if (current_traffic_pattern == NS_GREEN) {
+					next_traffic_pattern = NS_YELLOW;
+					next_light_time = 2 * 1000;
+					continue_cycle = false;
+				}
+				else if (current_traffic_pattern == EW_RED) {
+					next_traffic_pattern = EW_RED;
+					next_light_time = 15 * 1000;
+					continue_cycle = false;
+				}
+
+
 			}
 		}
-		else {
-			// default loop
+	}                                                          
+	else if (requests_crosswalk) {
+		
+		Serial.println(" - - - - - - - - - - - - Checking crosswalks....");
+		if ((requests_crosswalk & 0x0F) && (current_traffic_pattern == EW_GREEN) && (light_on_time > 4 * 1000))  {
+			// NS Crosswalk priority over E/W
+			// if there's currently a long wait to cross,
+			// leave it green for a little bit before transitioning
+			next_traffic_pattern = EW_GREEN;
+			next_light_time = 1 * 1000;
+			continue_cycle = false;
+			Serial.println("EW_GREEN for 1 more seconds requested. n.t.p. = 4");
 		}
+		else if ((requests_crosswalk & 0xF0) && (current_traffic_pattern == NS_GREEN) && (light_on_time > 4 * 1000))  {
+			// NS Crosswalk priority over E/W
+			// if there's currently a long wait to cross,
+			// leave it green for a little bit before transitioning
+			next_traffic_pattern = NS_GREEN;
+			next_light_time = 1 * 1000;
+			continue_cycle = false;
+			Serial.println("NS_GREEN for 1 more seconds requested. n.t.p. = 1");
+		}
+
 	}
 
-	pattern_cycle_index++;
-	if (pattern_cycle_index > 5) pattern_cycle_index = 0;
-	Serial.print("- - - - - - - - - pci: ");
-	Serial.println(pattern_cycle_index);
+
+
+	if (continue_cycle) {
+		next_traffic_pattern = current_traffic_pattern + (TrafficPatterns)1;
+		if (next_traffic_pattern > 5) next_traffic_pattern = NS_RED;
+		next_light_time = traffic_pattern_times[next_traffic_pattern];
+	}
+
+	Serial.print("next_traffic_pattern: ");
+	Serial.println(next_traffic_pattern);
+	new_pattern = traffic_pattern_lights[next_traffic_pattern];
 
 	for (int i = 0; i < 4; i++) {
-		testing_pattern.bulbs[i] = (default_pattern_cycle[pattern_cycle_index] >> (3 * i)) & 0x07; 
+		testing_pattern.bulbs[i] = (new_pattern >> (3 * i)) & 0x07; 
 	}
-	testing_pattern.time_in_pattern = default_pattern_delays[pattern_cycle_index];
+	testing_pattern.time_in_pattern = next_light_time;
+
+	if (next_traffic_pattern == NS_GREEN) requests_crosswalk = requests_crosswalk & 0xF0;
+	if (next_traffic_pattern == EW_GREEN) requests_crosswalk = requests_crosswalk & 0x0F;
+	if ((requests_emergency) && ((current_traffic_pattern == NS_RED) || (current_traffic_pattern == EW_RED))) {
+		requests_emergency = 0x00;
+	}
+
+	current_traffic_pattern = next_traffic_pattern;
 }
 
 void pollSlaves() {
@@ -239,7 +327,9 @@ void pollSlaves() {
 				char c = Wire.read();
 				if (c) {
 					Serial.print("Got response: ");
-					Serial.println(c, HEX);
+					Serial.print(c, HEX);
+					Serial.print("\t from ID: ");
+					Serial.println(slave_id[i]);
 					
 					if (c & EMERGENCY) {
 						requests_emergency |= 1 << i;
@@ -249,16 +339,79 @@ void pollSlaves() {
 					}
 					if (c & EAST_WEST) {
 						requests_crosswalk |= 1 << (i + 4);
+
 					}
 					if (c & 0x80) {
 						// fault flag from slave
+						testing_pattern.status_reg |= FAULT;
 						fault = 1;
 					}
-				} else Serial.println("Zero response from slave");
+				}// else Serial.println("Zero response from slave");
 			}
 
 	}
+
+
+	unsigned long light_on_time = millis() - light_time;
+
+	if ((requests_crosswalk & 0x0F) && (current_traffic_pattern == EW_GREEN) && (light_on_time > 4 * 1000))  {
+		testing_pattern.status_reg |= STANDARD_UPDATE;
+		Serial.println("Updated status register from inside pollSlaves()");
+	}
+	else if ((requests_crosswalk & 0xF0) && (current_traffic_pattern == NS_GREEN) && (light_on_time > 4 * 1000))  {
+		testing_pattern.status_reg |= STANDARD_UPDATE;
+		Serial.println("Updated status register from inside pollSlaves()");
+	}
+
+	unsigned char re  = requests_emergency;
+	if (re) {
+		if (!((re & (re - 1)) == 0)) { // if not a power of 2 / more than 1 bit set
+			Serial.println("Multiple emergency requests");
+			if (current_traffic_pattern == NS_RED) {
+				testing_pattern.status_reg |= URGENT_UPDATE;
+			}	
+			else if (current_traffic_pattern == EW_RED) {
+				testing_pattern.status_reg |= URGENT_UPDATE;
+			}
+			else if (current_traffic_pattern == NS_GREEN) {
+				testing_pattern.status_reg |= URGENT_UPDATE;
+			}
+			else if (current_traffic_pattern == EW_GREEN) {
+				testing_pattern.status_reg |= URGENT_UPDATE;
+			}
+		}
+		else { // only 1 light
+			Serial.println("Single emergency requests");
+			unsigned char idx = 0;
+			for (int i = 0; i < 4; i++) {
+				if ((re >> i) & 0x01) idx = i; // bit shift to find which slave index
+			}
+			Serial.println(idx);
+
+			if (idx == 1 || idx == 3) {
+				// If slave is NS
+				if (current_traffic_pattern == EW_GREEN) {
+					testing_pattern.status_reg |= URGENT_UPDATE;
+				}
+				else if (current_traffic_pattern == NS_RED) {
+					testing_pattern.status_reg |= URGENT_UPDATE;
+				}
+
+
+			} 
+			else if (idx == 0 || idx == 2) {
+				// If slave is EW
+				if (current_traffic_pattern == NS_GREEN) {
+					testing_pattern.status_reg |= URGENT_UPDATE;
+				}
+				else if (current_traffic_pattern == EW_RED) {
+					testing_pattern.status_reg |= URGENT_UPDATE;
+				}
+			}
+		}
+	}
 }
+
 
 
 void sm_tick(States state) {
@@ -340,7 +493,7 @@ void sm_tick(States state) {
 		case INIT:
 			// initialize all global variables and "clear" things up
 			for (int i = 0; i < 4; i++) {
-				testing_pattern.bulbs[i] = (default_pattern_cycle[0] >> (3 * i)) & 0x07; 
+				testing_pattern.bulbs[i] = (traffic_pattern_lights[0] >> (3 * i)) & 0x07; 
 			}
 			testing_pattern.time_in_pattern = 4 * 1000; // 10s
 			testing_pattern.status_reg = 0x00 | WAITING;
@@ -399,10 +552,19 @@ void setup() {
 
 void loop() {
 	// put your main code here, to run repeatedly:
+	
 	Serial.println("- LOOP - ");
-	delay(TICK_PERIOD);
-
+	Serial.print("Status: ");
+	Serial.print(testing_pattern.status_reg, BIN);
+	Serial.print("\tcurrent_traffic_pattern = ");
+	Serial.println(current_traffic_pattern);
+	
 	sys_time = millis();
 	state_time = sys_time - sys_state_time;	
 	sm_tick(sys_state);
+
+	delay(TICK_PERIOD);
+	
+	Serial.println(" ");
+
 }
