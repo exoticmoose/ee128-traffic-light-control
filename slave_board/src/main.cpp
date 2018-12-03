@@ -11,7 +11,8 @@
 #define EAST_WEST 0x04
 #define ERROR_MODE 0x80
 
-#define MY_ADDRESS 8
+#define MY_ADDRESS 16
+
 
 int last_instruction_delay = 0;
 unsigned char displayed_bulbs = 0x00;
@@ -26,15 +27,13 @@ char Last_Sent = 0;
 char* Message = 0;
 
 
-
-
 void receiveEvent(int var) {
 	last_instruction_delay = 0;
 
 	unsigned char rx_slave_id = Wire.read();
 	unsigned char bulbs = Wire.read();
-	//unsigned char tmp_status_reg = Wire.read();
 	unsigned int tmp_time_in_pattern = 0;
+	
 	for (int i = 0; i < 4; i++) {
 		unsigned char c = Wire.read();
 		tmp_time_in_pattern |= (c << (8 * i));
