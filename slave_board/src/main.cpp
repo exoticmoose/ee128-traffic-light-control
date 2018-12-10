@@ -1,3 +1,19 @@
+/*
+Traffic Light Control System - Slave Board
+Ruperd Wilson II, rwils005@ucr.edu
+Paul Schneider, pschn002@ucr.edu
+9 December 2018
+
+
+Developed for EE128 @ UCR - Fall 2018 - Dr. Hyoseung Kim
+
+Light controller (slave) element of a traffic control system, to be used in 
+conjunction with single master board over I2C/Wire. System capable of 
+response to 8 (2 at each corner) pedestrian crosswalks and IR sensor input
+to control traffic light state.
+
+*/
+
 #include <Arduino.h>
 #include <Wire.h>
 
@@ -11,7 +27,7 @@
 #define EAST_WEST 0x04
 #define ERROR_MODE 0x80
 
-#define MY_ADDRESS 16
+#define MY_ADDRESS 8 // CHANGE BETWEEN DIFFERENT SLAVE FLASHES
 
 
 int last_comms_delay = 0;

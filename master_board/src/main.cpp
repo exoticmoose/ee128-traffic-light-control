@@ -1,3 +1,19 @@
+/*
+Traffic Light Control System - Master Board
+Paul Schneider, pschn002@ucr.edu
+9 December 2018
+
+
+Developed for EE128 @ UCR - Fall 2018 - Dr. Hyoseung Kim
+
+Master element of a traffic control system, to be used in conjunction with
+four light controller (slave) boards over I2C/Wire. System capable of 
+response to 8 (2 at each corner) pedestrian crosswalks and IR sensor input
+to control traffic light state.
+
+*/
+
+
 #include <Arduino.h>
 #include <Wire.h>
 
