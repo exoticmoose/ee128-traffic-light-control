@@ -83,7 +83,6 @@ void txLightsFrame(master_light_pattern new_pattern) {
 	}
 		
 	for (unsigned char i = 0; i < 4; i++) {
-		Wire.beginTransmission(slave_id[i]);
 		Wire.write(light_controllers[i].bulb_pattern);
 		Wire.write(system_pattern.time_in_pattern);
 		Wire.write(system_pattern.time_in_pattern >> 8);
@@ -236,7 +235,6 @@ void pollSlaves() {
 					}
 					if (c & EAST_WEST) {
 						requests_crosswalk |= 1 << (i + 4);
-
 					}
 				}// else Serial.println("Zero response from slave");
 			}
