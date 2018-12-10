@@ -83,10 +83,9 @@ unsigned char pollPatternUpdate() {
 		system_pattern.status_reg = FAULT;
 	}
 	else if (state_time >= system_pattern.time_in_pattern - TICK_PERIOD) {
-
 		system_pattern.status_reg = 0x00 | STANDARD_UPDATE;
-
-	} else system_pattern.status_reg = 0x00 | WAITING;
+	} 
+	else system_pattern.status_reg = 0x00 | WAITING;
 
 	return system_pattern.status_reg;
 }
@@ -171,7 +170,6 @@ void processOutputState() {
 			next_traffic_pattern = EW_GREEN;
 			next_light_time = 1 * 1000;
 			continue_cycle = false;
-			Serial.println("EW_GREEN for 1 more seconds requested. n.t.p. = 4");
 		}
 		else if ((requests_crosswalk & 0xF0) && (current_traffic_pattern == NS_GREEN) && (light_on_time > 4 * 1000))  {
 			// NS Crosswalk priority over E/W
@@ -180,12 +178,9 @@ void processOutputState() {
 			next_traffic_pattern = NS_GREEN;
 			next_light_time = 1 * 1000;
 			continue_cycle = false;
-			Serial.println("NS_GREEN for 1 more seconds requested. n.t.p. = 1");
 		}
 
 	}
-
-
 
 	if (continue_cycle) {
 		next_traffic_pattern = current_traffic_pattern + (TrafficPatterns)1;
@@ -286,8 +281,6 @@ void pollSlaves() {
 	}
 }
 
-
-
 void sm_tick(States state) {
 
 	sys_tick++;
@@ -378,12 +371,11 @@ void sm_tick(States state) {
 			fault_count++;
 			break;
 		case BEGIN:
-
+			// not entered
 			break;
 
 		default:
 			// again, please no
-			system_pattern.bulbs[0] = 0xCC;
 			break;
 	}
 
@@ -395,7 +387,7 @@ void sm_tick(States state) {
 void setup() {
 	// put your setup code here, to run once:
 	Wire.begin(); // no ID for master
-	Serial.begin(38400); // for debugging TODO
+	Serial.begin(38400); // for debugging
 
 	system_pattern.status_reg = 0x00 | WAITING ;
 	system_pattern.time_in_pattern = 12345;
@@ -408,20 +400,10 @@ void setup() {
 }
 
 void loop() {
-	// put your main code here, to run repeatedly:
-	
-	Serial.println("- LOOP - ");
-	Serial.print("Status: ");
-	Serial.print(system_pattern.status_reg, BIN);
-	Serial.print("\tcurrent_traffic_pattern = ");
-	Serial.println(current_traffic_pattern);
-	
+
 	sys_time = millis();
 	state_time = sys_time - sys_state_time;	
 	sm_tick(sys_state);
 
 	delay(TICK_PERIOD);
-	
-	Serial.println(" ");
-
 }
